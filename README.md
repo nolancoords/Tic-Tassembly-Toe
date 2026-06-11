@@ -97,14 +97,3 @@ build.bat       one-click build script
 README.md       this file
 ```
 
----
-
-## Troubleshooting
-
-| Problem | Fix |
-|---------|-----|
-| `nasm: command not found` | Add NASM install dir to PATH, restart cmd |
-| `golink: unknown file format` | Make sure you assembled with `-f win32` |
-| `undefined reference to _WinMain` | You must use `-entry WinMain` not `main` |
-| Window appears then crashes | Rebuild; make sure you're targeting 32-bit (`-f win32`, `-m32`) |
-| `gcc -m32` fails | Install MinGW multilib: `mingw-get install gcc mingw32-make` |
