@@ -1,6 +1,5 @@
 ; ============================================================
 ;  Tic-Tac-Toe in x86 NASM for Windows
-;  Pure Win32 GDI — no C runtime, just vibes and syscalls.
 ;
 ;  Build:
 ;    nasm -f win32 tictactoe.asm -o tictactoe.obj
@@ -8,7 +7,6 @@
 ;
 ;  Keys 1-9 place your piece (numpad layout).
 ;  SPACE restarts after the game ends.
-;  X always goes first.
 ; ============================================================
 
 bits 32
@@ -67,13 +65,10 @@ COL_TEXT equ 0x00E8F0F5
 PLAYER_X equ 1
 PLAYER_O equ 2
 
-; ── precomputed pixel centers for all 9 cells ───────────────
+; ── precomputed pixel centers for all 9 cells 
 ; Each entry is two dwords: cx, cy.
 ; Computed as: cx = MARGIN + (col * CELL) + CELL/2
 ;              cy = MARGIN + (row * CELL) + CELL/2
-; Laid out row-major so index matches board[] index directly.
-; This is the same idea as your LC-3 CELL_OFFSETS table —
-; one lookup, no math, nothing gets clobbered mid-draw.
 ;
 ;  cell 0 (row0,col0)  cell 1 (row0,col1)  cell 2 (row0,col2)
 ;  cell 3 (row1,col0)  cell 4 (row1,col1)  cell 5 (row1,col2)
@@ -119,7 +114,7 @@ msgDraw  db "DRAW!     Press SPACE to play again", 0
 ; ============================================================
 section .bss
 
-; --- your scratch space (8 dwords) -------------------------
+; --- your scratch space (8 dwords) 
 ; [0] = X win count  (auto-incremented each game)
 ; [1] = O win count  (auto-incremented each game)
 ; [2..7] = free — scores, game counter, options, etc.
@@ -151,12 +146,12 @@ msg_time    resd 1
 msg_ptx     resd 1
 msg_pty     resd 1
 
-; PAINTSTRUCT — hDC at offset 0
+; ── PAINTSTRUCT 
 ps         resb 64
 clientRect resb 16
 textRect   resb 16
 
-; ── game state ──────────────────────────────────────────────
+; ── game state 
 ; Same idea as your LC-3 xA000/xA200 areas — each has its own
 ; named home and we always read/write by name, never by offset
 ; from some other label.
@@ -166,7 +161,7 @@ gameOver    resb 1   ; 0 = live, 1 = done
 winner      resb 1   ; PLAYER_X, PLAYER_O, or 0 for draw
 winLine     resb 1   ; index 0-7 into winTable, 0xFF = nobody won
 
-; ── winning line pixel coords, written once when game ends ──
+; ── winning line pixel coords, written once when game ends 
 ; Stored here so the paint handler just reads them — no math,
 ; no register juggling, same discipline as CELL_OFFSETS lookup.
 winPt0x resd 1
@@ -174,7 +169,7 @@ winPt0y resd 1
 winPt1x resd 1
 winPt1y resd 1
 
-; ── scratch saved-register slots (like your D_R0..D_R6) ─────
+; ── scratch saved-register slots (like your D_R0..D_R6) 
 ; Used by helpers that need to preserve caller registers.
 cc_arg  resd 1   ; cellLookup input: cell index
 cc_cx   resd 1   ; cellLookup output: center X
@@ -289,7 +284,7 @@ initGame:
 ;  in:  [cc_arg] = cell index (0-8)
 ;  out: [cc_cx]  = center X pixel
 ;       [cc_cy]  = center Y pixel
-;  Trashes eax, ecx only. No division, no register surprises.
+;  Trashes eax, ecx only. 
 ; ============================================================
 cellLookup:
     mov  ecx, [cc_arg]
@@ -408,7 +403,7 @@ WndProc:
     jmp  .leave
 
 
-; ====== KEY HANDLER =========================================
+; ====== KEY HANDLER 
 .onKey:
     mov  ebx, [ebp+16]
 
@@ -502,7 +497,7 @@ WndProc:
     jmp  .leave
 
 
-; ====== PAINT HANDLER =======================================
+; ── PAINT HANDLER 
 .onPaint:
     push ps
     push dword [ebp+8]
@@ -510,7 +505,7 @@ WndProc:
     mov  [ebp-4], eax
     mov  esi, eax               ; esi = hDC throughout
 
-    ; --- background -----------------------------------------
+; ── BACKGROUND 
     push COL_BG
     call _CreateSolidBrush@4
     mov  edi, eax
@@ -527,7 +522,7 @@ WndProc:
     push edi
     call _DeleteObject@4
 
-    ; --- grid lines -----------------------------------------
+; ── LINES 
     push LINE_W
     push 0
     push COL_GRID
@@ -539,7 +534,7 @@ WndProc:
     call _SelectObject@8
     mov  ebx, eax               ; save old pen
 
-    ; --- VERTICAL LINE 1 (Left Col Boundary) ---
+
     push 0
     push (MARGIN + CELL*3)     ; Y bottom
     push (MARGIN + CELL)       ; X left-column
@@ -551,7 +546,6 @@ WndProc:
     push esi
     call _LineTo@12
 
-    ; --- VERTICAL LINE 2 (Right Col Boundary) ---
     push 0
     push (MARGIN + CELL*3)     ; Y bottom
     push (MARGIN + CELL*2)     ; X right-column
@@ -563,7 +557,6 @@ WndProc:
     push esi
     call _LineTo@12
 
-    ; --- HORIZONTAL LINE 1 (Top Row Boundary) ---
     push 0
     push (MARGIN + CELL)       ; Y top-row
     push (MARGIN + CELL*3)     ; X right-edge
@@ -575,7 +568,6 @@ WndProc:
     push esi
     call _LineTo@12
 
-    ; --- HORIZONTAL LINE 2 (Bottom Row Boundary) ---
     push 0
     push (MARGIN + CELL*2)     ; Y bottom-row
     push (MARGIN + CELL*3)     ; X right-edge
@@ -587,16 +579,14 @@ WndProc:
     push esi
     call _LineTo@12
 
-    ; --- cleanup pen ---
+; ── cleanup pen 
     push ebx
     push esi
     call _SelectObject@8
     push edi
     call _DeleteObject@4
 
-    ; --- pieces ---------------------------------------------
-    ; Walk cells 0-8. Cell counter lives on the stack so it
-    ; survives all the register traffic inside each draw block.
+; ── pieces 
     push 0                      ; cell counter
 
 .pieceLoop:
@@ -619,7 +609,7 @@ WndProc:
     cmp  al, PLAYER_X
     je   .doPieceX
 
-    ; --- draw O ---------------------------------------------
+; ── draw O 
     push 4
     push 0
     push COL_O
@@ -669,7 +659,7 @@ WndProc:
 
     jmp  .pieceCellNext
 
-    ; --- draw X ---------------------------------------------
+; ── draw X 
 .doPieceX:
     push 4
     push 0
